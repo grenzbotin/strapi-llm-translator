@@ -38,7 +38,7 @@ The Strapi LLM Translator plugin enhances your localization workflow by utilisin
 1. Install the plugin in your Strapi project:
 
 ```bash
-npm install tbd
+npm install strapi-llm-translator
 ```
 
 2. Configure environment variables:
