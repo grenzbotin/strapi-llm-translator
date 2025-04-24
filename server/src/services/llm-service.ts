@@ -1,4 +1,4 @@
-import type { Core, Plugin } from '@strapi/strapi';
+import type { Core } from '@strapi/strapi';
 import { OpenAI } from 'openai';
 
 import {
@@ -9,7 +9,13 @@ import {
   TranslationResponse,
   UIDField,
 } from '../../src/types';
-import { DEFAULT_SYSTEM_PROMPT, SYSTEM_PROMPT_APPENDIX } from '../config/constants';
+import {
+  DEFAULT_SYSTEM_PROMPT,
+  SYSTEM_PROMPT_APPENDIX,
+  SYSTEM_PROMPT_FIX,
+  USER_PROMPT_FIX_PREFIX,
+} from '../config/constants';
+import { cleanJSONString, balanceJSONBraces, safeJSONParse } from '../utils/json-utils';
 
 const openai = new OpenAI({
   baseURL: process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_BASE_URL,
@@ -215,7 +221,7 @@ const llmService = ({ strapi }: { strapi: Core.Strapi }): LLMServiceType => ({
       const prompt = buildPrompt(translationPayload, config.targetLanguage);
       const systemPrompt = await buildSystemPrompt(userConfig);
       const response = await callLLMProvider(prompt, systemPrompt, model, userConfig);
-      const translatedData = parseLLMResponse(response);
+      const translatedData = await parseLLMResponse(response);
 
       // Get base merged content
       const mergedContent = mergeTranslatedContent(fields, translatedData, translatableFields);
@@ -264,8 +270,9 @@ IMPORTANT RULES:
 4. Keep HTML tags intact if present
 5. Preserve any special characters or placeholders
 6. Return ONLY the translated JSON object
-7. Do not add any explanations or comments
-8. Ensure professional and culturally appropriate translations
+7. Ensure the JSON is valid and well-formed, all values must be strings
+8. Do not add any explanations or comments
+9. Ensure professional and culturally appropriate translations
 
 SOURCE JSON:
 ${JSON.stringify(fields, null, 2)}`;
@@ -288,15 +295,25 @@ const buildSystemPrompt = async (config: PluginConfig): Promise<string> => {
   return `${config.systemPrompt || DEFAULT_SYSTEM_PROMPT} ${SYSTEM_PROMPT_APPENDIX}`;
 };
 
+const createLLMRequest = (
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  temperature = 0.1
+) => {
+  return openai.chat.completions.create({
+    model,
+    messages,
+    temperature,
+  });
+};
+
 const callLLMProvider = async (
   prompt: string,
   systemPrompt: string,
   model: string,
   config: PluginConfig
 ): Promise<any> => {
-  const response = await openai.chat.completions.create({
-    model: model,
-    messages: [
+  return createLLMRequest(
+    [
       {
         role: 'system',
         content: systemPrompt,
@@ -306,56 +323,46 @@ const callLLMProvider = async (
         content: prompt,
       },
     ],
-    temperature: config.temperature,
-  });
-
-  return response;
+    config.temperature
+  );
 };
 
-const parseLLMResponse = (response: any): Record<string, any> => {
+const requestJSONCorrection = async (invalidJson: string): Promise<Record<string, any>> => {
+  const response = await createLLMRequest([
+    {
+      role: 'system',
+      content: SYSTEM_PROMPT_FIX,
+    },
+    {
+      role: 'user',
+      content: `${USER_PROMPT_FIX_PREFIX} ${invalidJson}`,
+    },
+  ]);
+
+  const correctedContent = response.choices[0]?.message?.content;
+  if (!correctedContent) throw new Error('No content in correction response');
+
+  return safeJSONParse(correctedContent.trim());
+};
+
+const parseLLMResponse = async (response: any): Promise<Record<string, any>> => {
   try {
     const content = response.choices[0]?.message?.content;
     if (!content) throw new Error('No content in response');
 
-    // Remove markdown code block formatting if present
-    const cleanContent = content
-      .replace(/^```json\s*\n/, '') // Remove opening ```json with any whitespace
-      .replace(/^```\s*\n/, '') // Remove opening ``` without json
-      .replace(/\n\s*```$/, '') // Remove closing ``` with any whitespace
-      .replace(/\u200B/g, '') // Remove zero-width spaces
-      .replace(/[\u2018\u2019]/g, "'") // Replace smart quotes
-      .replace(/[\u201C\u201D]/g, '"') // Replace smart double quotes
-      .trim(); // Trim any leading/trailing whitespace
+    const cleanContent = cleanJSONString(content);
 
-    // First attempt to parse
     try {
-      const parsed = JSON.parse(cleanContent);
-      if (typeof parsed === 'object' && parsed !== null) {
-        return parsed;
-      }
-      throw new Error('Invalid response format - not an object');
+      return safeJSONParse(cleanContent);
     } catch (parseError) {
-      // Count opening and closing braces as often the LLM returns an unbalanced JSON
-      const openBraces = (cleanContent.match(/{/g) || []).length;
-      const closeBraces = (cleanContent.match(/}/g) || []).length;
+      const balancedContent = balanceJSONBraces(cleanContent);
 
-      if (openBraces > closeBraces) {
-        // Add missing closing braces
-        const missingBraces = openBraces - closeBraces;
-        const fixedContent = cleanContent + '}'.repeat(missingBraces);
-
-        try {
-          const parsed = JSON.parse(fixedContent);
-          if (typeof parsed === 'object' && parsed !== null) {
-            return parsed;
-          }
-        } catch (secondError) {
-          console.error('Second parse attempt failed:', secondError);
-        }
+      try {
+        return safeJSONParse(balancedContent);
+      } catch (secondError) {
+        console.error('Second parse attempt failed:', secondError);
+        return await requestJSONCorrection(cleanContent);
       }
-
-      // If we get here, throw a detailed error
-      throw new Error(`JSON parsing failed: ${parseError.message}`);
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
