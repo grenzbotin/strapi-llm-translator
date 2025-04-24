@@ -21,7 +21,7 @@ The Strapi LLM Translator plugin enhances your localization workflow by utilisin
 
 ## ✅ Tested With
 
-- **Strapi**: v5.12.4
+- **Strapi**: v5.12.x
 - **LLM Providers**:
   - OpenAI: `gpt-4o`
   - Groq: `meta-llama/llama-4-scout-17b-16e-instruct`
@@ -32,6 +32,7 @@ The Strapi LLM Translator plugin enhances your localization workflow by utilisin
 
 - Strapi project (v5+)
 - API key for your preferred LLM provider, opt. BaseUrl + model name
+- Configured internationalization with at least two languages in your Strapi application
 
 ### Installation
 
