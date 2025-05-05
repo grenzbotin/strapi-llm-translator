@@ -41,7 +41,7 @@ const isTranslatableField = (
   }
 
   // Check if field is of type string or text
-  const isStringOrText = ['string', 'text'].includes(fieldSchema.type);
+  const isStringOrText = ['string', 'text', 'richtext'].includes(fieldSchema.type);
 
   // Exclude uid fields and non-localizable fields
   const isNotUID = fieldSchema.type !== 'uid';
