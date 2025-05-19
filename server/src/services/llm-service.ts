@@ -24,31 +24,7 @@ const openai = new OpenAI({
 
 const model = process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_MODEL;
 
-const isTranslatableField = (
-  contentType: Record<string, any>,
-  key: string,
-  value: any
-): boolean => {
-  // Skip if not a string value
-  if (typeof value !== 'string') {
-    return false;
-  }
 
-  // Get field schema from content type
-  const fieldSchema = contentType?.attributes?.[key];
-  if (!fieldSchema) {
-    return false;
-  }
-
-  // Check if field is of type string or text
-  const isStringOrText = ['string', 'text', 'richtext'].includes(fieldSchema.type);
-
-  // Exclude uid fields and non-localizable fields
-  const isNotUID = fieldSchema.type !== 'uid';
-  const isLocalizable = fieldSchema.pluginOptions?.i18n?.localized !== false;
-
-  return isStringOrText && isNotUID && isLocalizable;
-};
 
 const extractTranslatableFields = (
   contentType: Record<string, any>,
@@ -57,41 +33,66 @@ const extractTranslatableFields = (
 ): TranslatableField[] => {
   const translatableFields: TranslatableField[] = [];
 
-  // Handle top-level fields
-  Object.entries(fields).forEach(([key, value]) => {
-    if (isTranslatableField(contentType, key, value)) {
-      translatableFields.push({
-        path: [key],
-        value: value as string,
-        originalPath: [key],
-      });
+  const isTranslatableFieldSchema = (
+    schema: Record<string, any> | undefined,
+    value: any
+  ): boolean => {
+    if (!schema || typeof value !== 'string') {
+      return false;
     }
-  });
 
-  // Handle blocks with dynamic component checking
-  if (fields.blocks && Array.isArray(fields.blocks)) {
-    fields.blocks.forEach((block: any, blockIndex: number) => {
-      if (block.__component && components[block.__component]) {
-        const componentSchema = components[block.__component];
+    const isStringOrText = ['string', 'text', 'richtext'].includes(schema.type);
+    const isNotUID = schema.type !== 'uid';
+    const isLocalizable = schema.pluginOptions?.i18n?.localized !== false;
 
-        // Check each attribute in the component
-        Object.entries(componentSchema.attributes).forEach(([fieldName, schema]: [string, any]) => {
-          // Check if the field exists in the block and is of type string/text/richtext
-          if (
-            block[fieldName] &&
-            typeof block[fieldName] === 'string' &&
-            ['string', 'text', 'richtext'].includes(schema.type)
-          ) {
-            translatableFields.push({
-              path: ['blocks', String(blockIndex), fieldName],
-              value: block[fieldName],
-              originalPath: ['blocks', String(blockIndex), fieldName],
-            });
+    return isStringOrText && isNotUID && isLocalizable;
+  };
+
+  const traverse = (
+    schema: Record<string, any>,
+    data: Record<string, any>,
+    path: string[] = [],
+    originalPath: string[] = []
+  ) => {
+    Object.entries(schema.attributes || {}).forEach(([fieldName, fieldSchemaRaw]) => {
+      const fieldSchema = fieldSchemaRaw as Record<string, any>;
+      const value = data?.[fieldName];
+      if (value === undefined || value === null) {
+        return;
+      }
+
+      if (isTranslatableFieldSchema(fieldSchema, value)) {
+        translatableFields.push({
+          path: [...path, fieldName],
+          value,
+          originalPath: [...originalPath, fieldName],
+        });
+        return;
+      }
+
+      if (fieldSchema.type === 'component') {
+        const componentSchema = components[fieldSchema.component];
+        if (!componentSchema) return;
+
+        if (fieldSchema.repeatable && Array.isArray(value)) {
+          value.forEach((item: any, index: number) =>
+            traverse(componentSchema, item, [...path, fieldName, String(index)], [...originalPath, fieldName, String(index)])
+          );
+        } else if (typeof value === 'object') {
+          traverse(componentSchema, value, [...path, fieldName], [...originalPath, fieldName]);
+        }
+      } else if (fieldSchema.type === 'dynamiczone' && Array.isArray(value)) {
+        value.forEach((item: any, index: number) => {
+          const compSchema = components[item.__component];
+          if (compSchema) {
+            traverse(compSchema, item, [...path, fieldName, String(index)], [...originalPath, fieldName, String(index)]);
           }
         });
       }
     });
-  }
+  };
+
+  traverse(contentType, fields, [], []);
 
   return translatableFields;
 };
