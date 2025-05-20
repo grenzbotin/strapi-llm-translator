@@ -42,12 +42,18 @@ const extractTranslatableFields = (
     }
 
     const { type } = schema;
-    const isStringType = ['string', 'text', 'richtext'].includes(type) && typeof value === 'string';
+
+    const isStringType = ['string', 'text'].includes(type) && typeof value === 'string';
+
+    const isRichTextType =
+      ['richtext', 'richText', 'blocks'].includes(type) &&
+      (typeof value === 'string' || typeof value === 'object');
+
     const isJSONType = type === 'json' && typeof value === 'object';
     const isNotUID = type !== 'uid';
     const isLocalizable = schema.pluginOptions?.i18n?.localized !== false;
 
-    return (isStringType || isJSONType) && isNotUID && isLocalizable;
+    return (isStringType || isRichTextType || isJSONType) && isNotUID && isLocalizable;
   };
 
   const traverse = (
