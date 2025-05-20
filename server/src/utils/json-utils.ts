@@ -10,8 +10,21 @@ export const cleanJSONString = (content: string): string => {
 };
 
 export const balanceJSONBraces = (content: string): string => {
-  const openBraces = (content.match(/{/g) || []).length;
-  const closeBraces = (content.match(/}/g) || []).length;
+   let openBraces = 0;
+  let closeBraces = 0;
+  let inString = false;
+
+  for (let i = 0; i < content.length; i += 1) {
+    const char = content[i];
+    if (char === '"' && content[i - 1] !== '\\') {
+      inString = !inString;
+    }
+
+    if (!inString) {
+      if (char === '{') openBraces += 1;
+      if (char === '}') closeBraces += 1;
+    }
+  }
 
   if (openBraces > closeBraces) {
     return content + '}'.repeat(openBraces - closeBraces);
