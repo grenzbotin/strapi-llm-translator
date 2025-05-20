@@ -48,7 +48,7 @@ export interface GenerateRequestBody {
 
 export interface TranslatableField {
   path: string[];
-  value: string;
+  value: any;
   originalPath: string[];
 }
 

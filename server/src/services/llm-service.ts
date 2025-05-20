@@ -37,15 +37,17 @@ const extractTranslatableFields = (
     schema: Record<string, any> | undefined,
     value: any
   ): boolean => {
-    if (!schema || typeof value !== 'string') {
+    if (!schema) {
       return false;
     }
 
-    const isStringOrText = ['string', 'text', 'richtext'].includes(schema.type);
-    const isNotUID = schema.type !== 'uid';
+    const { type } = schema;
+    const isStringType = ['string', 'text', 'richtext'].includes(type) && typeof value === 'string';
+    const isJSONType = type === 'json' && typeof value === 'object';
+    const isNotUID = type !== 'uid';
     const isLocalizable = schema.pluginOptions?.i18n?.localized !== false;
 
-    return isStringOrText && isNotUID && isLocalizable;
+    return (isStringType || isJSONType) && isNotUID && isLocalizable;
   };
 
   const traverse = (
