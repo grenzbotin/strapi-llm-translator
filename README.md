@@ -6,7 +6,7 @@ The Strapi LLM Translator plugin enhances your localization workflow by utilisin
 
 ## 🚀 Key Features
 
-- 🌍 **Multi-field Support** - Translates all text-based fields (string, text, richtext) and JSON/Blocks content
+- 🌍 **Multi-field Support** - Translates all text-based fields (string, text, richtext) and JSON/Blocks content, including Strapi 5 structured rich text
 - 🔌 **LLM Agnostic** - Works with any OpenAI-compatible API (your choice of provider)
 - 📝 **Format Preservation** - Maintains markdown formatting during translation
 - 🔗 **Smart UUID Handling** - Auto-translates slugs when i18n is enabled with relative fields
