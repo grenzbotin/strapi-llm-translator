@@ -15,7 +15,12 @@ import {
   SYSTEM_PROMPT_FIX,
   USER_PROMPT_FIX_PREFIX,
 } from '../config/constants';
-import { cleanJSONString, balanceJSONBraces, safeJSONParse } from '../utils/json-utils';
+import {
+  cleanJSONString,
+  balanceJSONBraces,
+  safeJSONParse,
+  extractJSONObject,
+} from '../utils/json-utils';
 
 const openai = new OpenAI({
   baseURL: process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_BASE_URL,
@@ -24,31 +29,7 @@ const openai = new OpenAI({
 
 const model = process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_MODEL;
 
-const isTranslatableField = (
-  contentType: Record<string, any>,
-  key: string,
-  value: any
-): boolean => {
-  // Skip if not a string value
-  if (typeof value !== 'string') {
-    return false;
-  }
 
-  // Get field schema from content type
-  const fieldSchema = contentType?.attributes?.[key];
-  if (!fieldSchema) {
-    return false;
-  }
-
-  // Check if field is of type string or text
-  const isStringOrText = ['string', 'text', 'richtext'].includes(fieldSchema.type);
-
-  // Exclude uid fields and non-localizable fields
-  const isNotUID = fieldSchema.type !== 'uid';
-  const isLocalizable = fieldSchema.pluginOptions?.i18n?.localized !== false;
-
-  return isStringOrText && isNotUID && isLocalizable;
-};
 
 const extractTranslatableFields = (
   contentType: Record<string, any>,
@@ -57,41 +38,74 @@ const extractTranslatableFields = (
 ): TranslatableField[] => {
   const translatableFields: TranslatableField[] = [];
 
-  // Handle top-level fields
-  Object.entries(fields).forEach(([key, value]) => {
-    if (isTranslatableField(contentType, key, value)) {
-      translatableFields.push({
-        path: [key],
-        value: value as string,
-        originalPath: [key],
-      });
+  const isTranslatableFieldSchema = (
+    schema: Record<string, any> | undefined,
+    value: any
+  ): boolean => {
+    if (!schema) {
+      return false;
     }
-  });
 
-  // Handle blocks with dynamic component checking
-  if (fields.blocks && Array.isArray(fields.blocks)) {
-    fields.blocks.forEach((block: any, blockIndex: number) => {
-      if (block.__component && components[block.__component]) {
-        const componentSchema = components[block.__component];
+    const { type } = schema;
 
-        // Check each attribute in the component
-        Object.entries(componentSchema.attributes).forEach(([fieldName, schema]: [string, any]) => {
-          // Check if the field exists in the block and is of type string/text/richtext
-          if (
-            block[fieldName] &&
-            typeof block[fieldName] === 'string' &&
-            ['string', 'text', 'richtext'].includes(schema.type)
-          ) {
-            translatableFields.push({
-              path: ['blocks', String(blockIndex), fieldName],
-              value: block[fieldName],
-              originalPath: ['blocks', String(blockIndex), fieldName],
-            });
+    const isStringType = ['string', 'text'].includes(type) && typeof value === 'string';
+
+    const isRichTextType =
+      ['richtext', 'richText', 'blocks'].includes(type) &&
+      (typeof value === 'string' || typeof value === 'object');
+
+    const isJSONType = type === 'json' && typeof value === 'object';
+    const isNotUID = type !== 'uid';
+    const isLocalizable = schema.pluginOptions?.i18n?.localized !== false;
+
+    return (isStringType || isRichTextType || isJSONType) && isNotUID && isLocalizable;
+  };
+
+  const traverse = (
+    schema: Record<string, any>,
+    data: Record<string, any>,
+    path: string[] = [],
+    originalPath: string[] = []
+  ) => {
+    Object.entries(schema.attributes || {}).forEach(([fieldName, fieldSchemaRaw]) => {
+      const fieldSchema = fieldSchemaRaw as Record<string, any>;
+      const value = data?.[fieldName];
+      if (value === undefined || value === null) {
+        return;
+      }
+
+      if (isTranslatableFieldSchema(fieldSchema, value)) {
+        translatableFields.push({
+          path: [...path, fieldName],
+          value,
+          originalPath: [...originalPath, fieldName],
+        });
+        return;
+      }
+
+      if (fieldSchema.type === 'component') {
+        const componentSchema = components[fieldSchema.component];
+        if (!componentSchema) return;
+
+        if (fieldSchema.repeatable && Array.isArray(value)) {
+          value.forEach((item: any, index: number) =>
+            traverse(componentSchema, item, [...path, fieldName, String(index)], [...originalPath, fieldName, String(index)])
+          );
+        } else if (typeof value === 'object') {
+          traverse(componentSchema, value, [...path, fieldName], [...originalPath, fieldName]);
+        }
+      } else if (fieldSchema.type === 'dynamiczone' && Array.isArray(value)) {
+        value.forEach((item: any, index: number) => {
+          const compSchema = components[item.__component];
+          if (compSchema) {
+            traverse(compSchema, item, [...path, fieldName, String(index)], [...originalPath, fieldName, String(index)]);
           }
         });
       }
     });
-  }
+  };
+
+  traverse(contentType, fields, [], []);
 
   return translatableFields;
 };
@@ -270,7 +284,7 @@ IMPORTANT RULES:
 4. Keep HTML tags intact if present
 5. Preserve any special characters or placeholders
 6. Return ONLY the translated JSON object
-7. Ensure the JSON is valid and well-formed, all values must be strings
+7. Ensure the JSON is valid and well-formed. Keep arrays and nested objects intact
 8. Do not add any explanations or comments
 9. Ensure professional and culturally appropriate translations
 
@@ -303,6 +317,7 @@ const createLLMRequest = (
     model,
     messages,
     temperature,
+    response_format: { type: 'json_object' },
   });
 };
 
@@ -351,11 +366,12 @@ const parseLLMResponse = async (response: any): Promise<Record<string, any>> => 
     if (!content) throw new Error('No content in response');
 
     const cleanContent = cleanJSONString(content);
+    const jsonContent = extractJSONObject(cleanContent);
 
     try {
-      return safeJSONParse(cleanContent);
+      return safeJSONParse(jsonContent);
     } catch (parseError) {
-      const balancedContent = balanceJSONBraces(cleanContent);
+      const balancedContent = balanceJSONBraces(jsonContent);
 
       try {
         return safeJSONParse(balancedContent);
