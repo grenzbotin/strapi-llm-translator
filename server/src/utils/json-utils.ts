@@ -19,6 +19,15 @@ export const balanceJSONBraces = (content: string): string => {
   return content;
 };
 
+export const extractJSONObject = (content: string): string => {
+  const firstBrace = content.indexOf('{');
+  const lastBrace = content.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    return content.slice(firstBrace, lastBrace + 1);
+  }
+  return content;
+};
+
 export const safeJSONParse = (content: string): Record<string, any> => {
   const parsed = JSON.parse(content);
   if (typeof parsed === 'object' && parsed !== null) {

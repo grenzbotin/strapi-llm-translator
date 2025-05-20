@@ -15,7 +15,12 @@ import {
   SYSTEM_PROMPT_FIX,
   USER_PROMPT_FIX_PREFIX,
 } from '../config/constants';
-import { cleanJSONString, balanceJSONBraces, safeJSONParse } from '../utils/json-utils';
+import {
+  cleanJSONString,
+  balanceJSONBraces,
+  safeJSONParse,
+  extractJSONObject,
+} from '../utils/json-utils';
 
 const openai = new OpenAI({
   baseURL: process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_BASE_URL,
@@ -279,7 +284,7 @@ IMPORTANT RULES:
 4. Keep HTML tags intact if present
 5. Preserve any special characters or placeholders
 6. Return ONLY the translated JSON object
-7. Ensure the JSON is valid and well-formed, all values must be strings
+7. Ensure the JSON is valid and well-formed. Keep arrays and nested objects intact
 8. Do not add any explanations or comments
 9. Ensure professional and culturally appropriate translations
 
@@ -312,6 +317,7 @@ const createLLMRequest = (
     model,
     messages,
     temperature,
+    response_format: { type: 'json_object' },
   });
 };
 
@@ -360,11 +366,12 @@ const parseLLMResponse = async (response: any): Promise<Record<string, any>> => 
     if (!content) throw new Error('No content in response');
 
     const cleanContent = cleanJSONString(content);
+    const jsonContent = extractJSONObject(cleanContent);
 
     try {
-      return safeJSONParse(cleanContent);
+      return safeJSONParse(jsonContent);
     } catch (parseError) {
-      const balancedContent = balanceJSONBraces(cleanContent);
+      const balancedContent = balanceJSONBraces(jsonContent);
 
       try {
         return safeJSONParse(balancedContent);
