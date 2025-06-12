@@ -22,7 +22,7 @@ export type RequestContext<Body = object, PathParams = object, QueryParams = obj
   };
 };
 
-export interface PluginConfig {
+export interface PluginUserConfig {
   systemPrompt: string;
   temperature: number;
 }

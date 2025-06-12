@@ -56,3 +56,9 @@ export interface UIDField {
   fieldName: string;
   targetField: string;
 }
+
+export interface LLMConfigType {
+  llmEndpoint: string;
+  llmApiKey: string;
+  llmModel: string;
+}

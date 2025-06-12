@@ -1,4 +1,4 @@
-import { RequestContext, StrapiContext, GenerateRequestBody, PluginConfig } from 'src/types';
+import { GenerateRequestBody, PluginUserConfig, RequestContext, StrapiContext } from 'src/types';
 
 const controllers = ({ strapi }: StrapiContext) => ({
   // Genertate translations
@@ -36,7 +36,7 @@ const controllers = ({ strapi }: StrapiContext) => ({
     });
 
     const config = await pluginStore.get({ key: 'configuration' });
-    ctx.body = (config as PluginConfig) || {}; // Return empty object if no config exists yet
+    ctx.body = (config as PluginUserConfig) || {}; // Return empty object if no config exists yet
   },
 
   // Save the configuration
@@ -55,7 +55,7 @@ const controllers = ({ strapi }: StrapiContext) => ({
       value: { ...body },
     });
 
-    ctx.body = (await pluginStore.get({ key: 'configuration' })) as PluginConfig;
+    ctx.body = (await pluginStore.get({ key: 'configuration' })) as PluginUserConfig;
   },
 });
 
