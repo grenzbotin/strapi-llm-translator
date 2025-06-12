@@ -3,33 +3,34 @@ import { OpenAI } from 'openai';
 
 import {
   LLMServiceType,
-  PluginConfig,
+  PluginUserConfig,
   TranslatableField,
   TranslationConfig,
   TranslationResponse,
   UIDField,
 } from '../../src/types';
 import {
+  DEFAULT_LLM_BASE_URL,
+  DEFAULT_LLM_MODEL,
+  DEFAULT_LLM_TEMPERATURE,
   DEFAULT_SYSTEM_PROMPT,
   SYSTEM_PROMPT_APPENDIX,
   SYSTEM_PROMPT_FIX,
   USER_PROMPT_FIX_PREFIX,
 } from '../config/constants';
 import {
-  cleanJSONString,
   balanceJSONBraces,
-  safeJSONParse,
+  cleanJSONString,
   extractJSONObject,
+  safeJSONParse,
 } from '../utils/json-utils';
 
-const openai = new OpenAI({
-  baseURL: process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_BASE_URL,
-  apiKey: process.env.LLM_TRANSLATOR_LLM_API_KEY,
+const llmClient = new OpenAI({
+  baseURL: process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_BASE_URL ?? DEFAULT_LLM_BASE_URL,
+  apiKey: process.env.LLM_TRANSLATOR_LLM_API_KEY ?? 'not_set',
 });
 
-const model = process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_MODEL;
-
-
+const LLM_MODEL = process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_MODEL ?? DEFAULT_LLM_MODEL;
 
 const extractTranslatableFields = (
   contentType: Record<string, any>,
@@ -89,7 +90,12 @@ const extractTranslatableFields = (
 
         if (fieldSchema.repeatable && Array.isArray(value)) {
           value.forEach((item: any, index: number) =>
-            traverse(componentSchema, item, [...path, fieldName, String(index)], [...originalPath, fieldName, String(index)])
+            traverse(
+              componentSchema,
+              item,
+              [...path, fieldName, String(index)],
+              [...originalPath, fieldName, String(index)]
+            )
           );
         } else if (typeof value === 'object') {
           traverse(componentSchema, value, [...path, fieldName], [...originalPath, fieldName]);
@@ -98,7 +104,12 @@ const extractTranslatableFields = (
         value.forEach((item: any, index: number) => {
           const compSchema = components[item.__component];
           if (compSchema) {
-            traverse(compSchema, item, [...path, fieldName, String(index)], [...originalPath, fieldName, String(index)]);
+            traverse(
+              compSchema,
+              item,
+              [...path, fieldName, String(index)],
+              [...originalPath, fieldName, String(index)]
+            );
           }
         });
       }
@@ -234,10 +245,10 @@ const llmService = ({ strapi }: { strapi: Core.Strapi }): LLMServiceType => ({
       const translationPayload = prepareTranslationPayload(translatableFields);
       const prompt = buildPrompt(translationPayload, config.targetLanguage);
       const systemPrompt = await buildSystemPrompt(userConfig);
-      const response = await callLLMProvider(prompt, systemPrompt, model, userConfig);
+      const response = await callLLMProvider(prompt, systemPrompt, userConfig);
       const translatedData = await parseLLMResponse(response);
 
-      // Get base merged content
+      // Merge original content payload with translation
       const mergedContent = mergeTranslatedContent(fields, translatedData, translatableFields);
 
       // Handle UID fields as they might have a relation base to another translated field
@@ -292,7 +303,7 @@ SOURCE JSON:
 ${JSON.stringify(fields, null, 2)}`;
 };
 
-const getUserConfig = async (): Promise<PluginConfig> => {
+const getUserConfig = async (): Promise<PluginUserConfig> => {
   // Get configuration from plugin store
   const pluginStore = strapi.store({
     environment: strapi.config.environment,
@@ -300,21 +311,21 @@ const getUserConfig = async (): Promise<PluginConfig> => {
     name: 'strapi-llm-translator',
   });
 
-  const config = (await pluginStore.get({ key: 'configuration' })) as PluginConfig;
+  const config = (await pluginStore.get({ key: 'configuration' })) as PluginUserConfig;
 
   return config;
 };
 
-const buildSystemPrompt = async (config: PluginConfig): Promise<string> => {
-  return `${config.systemPrompt || DEFAULT_SYSTEM_PROMPT} ${SYSTEM_PROMPT_APPENDIX}`;
+const buildSystemPrompt = async (userConfig: PluginUserConfig): Promise<string> => {
+  return `${userConfig?.systemPrompt || DEFAULT_SYSTEM_PROMPT} ${SYSTEM_PROMPT_APPENDIX}`;
 };
 
 const createLLMRequest = (
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
   temperature = 0.1
 ) => {
-  return openai.chat.completions.create({
-    model,
+  return llmClient.chat.completions.create({
+    model: LLM_MODEL,
     messages,
     temperature,
     response_format: { type: 'json_object' },
@@ -324,8 +335,7 @@ const createLLMRequest = (
 const callLLMProvider = async (
   prompt: string,
   systemPrompt: string,
-  model: string,
-  config: PluginConfig
+  userConfig: PluginUserConfig
 ): Promise<any> => {
   return createLLMRequest(
     [
@@ -338,7 +348,7 @@ const callLLMProvider = async (
         content: prompt,
       },
     ],
-    config.temperature
+    userConfig?.temperature ?? DEFAULT_LLM_TEMPERATURE
   );
 };
 

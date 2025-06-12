@@ -7,7 +7,7 @@ The Strapi LLM Translator plugin enhances your localization workflow by utilisin
 ## 🚀 Key Features
 
 - 🌍 **Multi-field Support** - Translates all text-based fields (string, text, richtext) and JSON/Blocks content, including Strapi 5 structured rich text
-- 🔌 **LLM Agnostic** - Works with any OpenAI-compatible API (your choice of provider)
+- 🔌 **LLM Agnostic** - Works with any OpenAI-compatible API (your choice of provider or local)
 - 📝 **Format Preservation** - Maintains markdown formatting during translation
 - 🔗 **Smart UUID Handling** - Auto-translates slugs when i18n is enabled with relative fields
 - ⚡ **Auto-fill** - Instantly populates generated translations
@@ -21,17 +21,18 @@ The Strapi LLM Translator plugin enhances your localization workflow by utilisin
 
 ## ✅ Tested With
 
-- **Strapi**: v5.12.x
+- **Strapi**: v5.12.x, v5.15.x
 - **LLM Providers**:
   - OpenAI: `gpt-4o`
   - Groq: `meta-llama/llama-4-scout-17b-16e-instruct`
+  - Local: `Ollama`, e.g. `phi4-mini`
 
 ## 🛠️ Installation & Setup
 
 ### Prerequisites
 
 - Strapi project (v5+)
-- API key for your preferred LLM provider, opt. BaseUrl + model name
+- API key for your preferred LLM provider, Base Url + Model Name
 - Configured internationalization with at least two languages in your Strapi application
 
 ### Installation
@@ -45,7 +46,7 @@ npm install strapi-llm-translator
 2. Configure environment variables:
 
 ```
-# Required - Your LLM provider API key
+# Optional - Your LLM provider API key (Can be left empty if there is no API Key needed)
 LLM_TRANSLATOR_LLM_API_KEY=
 
 # Optional - Defaults to OpenAI's endpoint

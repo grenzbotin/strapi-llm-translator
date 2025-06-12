@@ -39,20 +39,20 @@
   "dependencies": {
     "@strapi/design-system": "^2.0.0-rc.21",
     "@strapi/icons": "^2.0.0-rc.21",
-    "openai": "^4.94.0",
-    "react-intl": "^7.1.10"
+    "openai": "^5.3.0",
+    "react-intl": "^7.1.11"
   },
   "devDependencies": {
     "@strapi/sdk-plugin": "^5.3.2",
-    "@strapi/strapi": "^5.12.4",
-    "@strapi/typescript-utils": "^5.12.4",
-    "@types/react": "^19.1.2",
-    "@types/react-dom": "^19.1.2",
+    "@strapi/strapi": "^5.15.1",
+    "@strapi/typescript-utils": "^5.15.1",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
     "prettier": "^3.5.3",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.30.0",
-    "styled-components": "^6.1.17",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.2",
+    "styled-components": "^6.1.18",
     "typescript": "^5.8.3"
   },
   "peerDependencies": {
