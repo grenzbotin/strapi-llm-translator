@@ -37,7 +37,6 @@
     "test:ts:back": "run -T tsc -p server/tsconfig.json"
   },
   "dependencies": {
-    "@azure/openai": "^2.0.0",
     "@strapi/design-system": "^2.0.0-rc.21",
     "@strapi/icons": "^2.0.0-rc.21",
     "openai": "^5.3.0",
