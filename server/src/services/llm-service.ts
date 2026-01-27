@@ -32,6 +32,29 @@ const llmClient = new OpenAI({
 
 const LLM_MODEL = process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_MODEL ?? DEFAULT_LLM_MODEL;
 
+const BATCH_SIZE = 10; // TODO
+
+// helper to merge batches safely
+const deepMerge = (target: any, source: any): any => {
+  const output = { ...target };
+  for (const key in source) {
+    const sourceValue = source[key];
+    const targetValue = target[key];
+
+    if (
+      sourceValue instanceof Object &&
+      !Array.isArray(sourceValue) &&
+      targetValue instanceof Object &&
+      !Array.isArray(targetValue)
+    ) {
+      output[key] = deepMerge(targetValue, sourceValue);
+    } else {
+      output[key] = sourceValue;
+    }
+  }
+  return output;
+};
+
 const extractTranslatableFields = (
   contentType: Record<string, any>,
   fields: Record<string, any>,
@@ -242,11 +265,29 @@ const llmService = ({ strapi }: { strapi: Core.Strapi }): LLMServiceType => ({
       const userConfig = await getUserConfig();
 
       const translatableFields = extractTranslatableFields(contentType, fields, components);
-      const translationPayload = prepareTranslationPayload(translatableFields);
-      const prompt = buildPrompt(translationPayload, config.targetLanguage);
+
+      // Split translatableFields in batches
+      const batches: TranslatableField[][] = [];
+      for (let i = 0; i < translatableFields.length; i += BATCH_SIZE) {
+        batches.push(translatableFields.slice(i, i + BATCH_SIZE));
+      }
+
       const systemPrompt = await buildSystemPrompt(userConfig);
-      const response = await callLLMProvider(prompt, systemPrompt, userConfig);
-      const translatedData = await parseLLMResponse(response);
+
+      // Process all batches parallel
+      const translatedResults = await Promise.all(
+        batches.map(async (batch) => {
+          const translationPayload = prepareTranslationPayload(batch);
+          const prompt = buildPrompt(translationPayload, config.targetLanguage);
+          const response = await callLLMProvider(prompt, systemPrompt, userConfig);
+          return await parseLLMResponse(response);
+        })
+      );
+
+      // Merge translated batch results into one object
+      const translatedData = translatedResults.reduce((acc, curr) => {
+        return deepMerge(acc, curr);
+      }, {});
 
       // Merge original content payload with translation
       const mergedContent = mergeTranslatedContent(fields, translatedData, translatableFields);
