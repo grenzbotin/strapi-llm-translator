@@ -24,6 +24,7 @@ The Strapi LLM Translator plugin enhances your localization workflow by utilisin
 - **Strapi**: v5.12.x, v5.15.x
 - **LLM Providers**:
   - OpenAI: `gpt-4o`
+  - Azure OpenAI: `gpt-4.1`
   - Groq: `meta-llama/llama-4-scout-17b-16e-instruct`
   - Local: `Ollama`, e.g. `phi4-mini`
 
@@ -32,7 +33,7 @@ The Strapi LLM Translator plugin enhances your localization workflow by utilisin
 ### Prerequisites
 
 - Strapi project (v5+)
-- API key for your preferred LLM provider, Base Url + Model Name
+- API key for your preferred LLM provider, Base Url + Model Name (+ API Version for Azure OpenAI)
 - Configured internationalization with at least two languages in your Strapi application
 
 ### Installation
@@ -51,6 +52,9 @@ LLM_TRANSLATOR_LLM_API_KEY=
 
 # Optional - Defaults to OpenAI's endpoint
 STRAPI_ADMIN_LLM_TRANSLATOR_LLM_BASE_URL=
+
+# Optional - ⚠️ Only Required for Azure OpenAI
+STRAPI_ADMIN_LLM_TRANSLATOR_AZURE_API_VERSION=
 
 # Optional - Defaults to gpt-4o
 STRAPI_ADMIN_LLM_TRANSLATOR_LLM_MODEL=

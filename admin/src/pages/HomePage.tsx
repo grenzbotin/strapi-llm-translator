@@ -209,6 +209,30 @@ const HomePage = () => {
                 <Field.Error />
                 <Field.Hint />
               </Field.Root>
+              <Field.Root
+                id="llm_api_version"
+                flex={1}
+                hint={formatMessage({
+                  id: getTranslation('plugin.page.form.llm_api_version_hint'),
+                  defaultMessage:
+                    '⚠️ Required to enable Azure OpenAI. Azure API Version for the LLM API. It needs to be set as an environment variable.',
+                })}
+              >
+                <Field.Label>
+                  {formatMessage({
+                    id: getTranslation('plugin.page.form.llm_api_version'),
+                    defaultMessage: 'LLM Azure API Version',
+                  })}
+                </Field.Label>
+                <TextInput
+                  id="llm_api_version"
+                  value={process.env.STRAPI_ADMIN_LLM_TRANSLATOR_AZURE_API_VERSION as string}
+                  disabled
+                  name="llm_api_version"
+                />
+                <Field.Error />
+                <Field.Hint />
+              </Field.Root>
             </Flex>
             <Flex gap={2} marginTop={6} justifyContent="flex-end">
               <Button variant="secondary" type="button" onClick={handleRestore} marginTop={4}>

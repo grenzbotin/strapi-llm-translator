@@ -5,6 +5,7 @@ export default {
     llmApiKey: env('LLM_TRANSLATOR_LLM_API_KEY'),
     llmEndpoint: env('STRAPI_ADMIN_LLM_TRANSLATOR_LLM_BASE_URL'),
     llmModel: env('STRAPI_ADMIN_LLM_TRANSLATOR_LLM_MODEL'),
+    llmAzureApiVersion: env('STRAPI_ADMIN_LLM_TRANSLATOR_AZURE_API_VERSION'),
   }),
   validator(config) {
     const PLUGIN_NAME = 'Strapi LLM Translator';
@@ -32,6 +33,18 @@ export default {
       console.warn(`⚠️  LLM Model: Using default (${DEFAULT_LLM_MODEL})`);
     } else {
       console.info(`✅ LLM Model: Configured (${model})`);
+    }
+
+    // Validate LLM Azure API Version
+    const apiVersion = config?.llmAzureApiVersion;
+    if (!config?.llmAzureApiVersion) {
+      console.info(`✅ Using default OpenAI => no API Version configured`);
+      console.warn(
+        `⚠️  LLM Azure API Version : If you wish to use Azure OpenAI, please configure an API Version`
+      );
+    } else {
+      console.info(`✅ Using Azure OpenAI`);
+      console.info(`✅ LLM Azure API Version : Configured (${apiVersion})`);
     }
 
     console.info('========================================================\n');

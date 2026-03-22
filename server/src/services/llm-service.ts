@@ -1,5 +1,5 @@
 import type { Core } from '@strapi/strapi';
-import { OpenAI } from 'openai';
+import { OpenAI, AzureOpenAI } from 'openai';
 
 import {
   LLMServiceType,
@@ -25,10 +25,16 @@ import {
   safeJSONParse,
 } from '../utils/json-utils';
 
-const llmClient = new OpenAI({
-  baseURL: process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_BASE_URL ?? DEFAULT_LLM_BASE_URL,
-  apiKey: process.env.LLM_TRANSLATOR_LLM_API_KEY ?? 'not_set',
-});
+const llmClient = process.env.STRAPI_ADMIN_LLM_TRANSLATOR_AZURE_API_VERSION
+  ? new AzureOpenAI({
+      baseURL: process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_BASE_URL ?? DEFAULT_LLM_BASE_URL,
+      apiKey: process.env.LLM_TRANSLATOR_LLM_API_KEY ?? 'not_set',
+      apiVersion: process.env.STRAPI_ADMIN_LLM_TRANSLATOR_AZURE_API_VERSION,
+    })
+  : new OpenAI({
+      baseURL: process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_BASE_URL ?? DEFAULT_LLM_BASE_URL,
+      apiKey: process.env.LLM_TRANSLATOR_LLM_API_KEY ?? 'not_set',
+    });
 
 const LLM_MODEL = process.env.STRAPI_ADMIN_LLM_TRANSLATOR_LLM_MODEL ?? DEFAULT_LLM_MODEL;
 
