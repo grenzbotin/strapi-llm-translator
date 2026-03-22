@@ -86,9 +86,7 @@ To contribute to the plugin development:
 
 ## Contributors ✨
 
-Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
-
-<!-- You can use the all-contributors bot or just list them manually -->
+Thanks goes to these wonderful people:
 
 - [jacco-webleads](https://github.com/jacco-webleads) (Parallel Batch Processing)
 - [asiegrist](https://github.com/asiegrist) (Azure OpenAI Support)

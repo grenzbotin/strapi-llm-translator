@@ -75,7 +75,7 @@
   "author": "grenzbotin <franziska@vulpis.dev>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/grenzbotin/strapi-llm-translator.git"
+    "url": "git+https://github.com/grenzbotin/strapi-llm-translator.git"
   },
   "bugs": {
     "url": "https://github.com/grenzbotin/strapi-llm-translator/issues"
