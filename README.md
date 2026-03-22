@@ -84,9 +84,19 @@ To contribute to the plugin development:
 4. In a separate terminal, watch the plugin for changes:
    `npm run watch:link`
 
-## About
+## Contributors ✨
 
-Franziska Fieke ([grenzbotin](https://github.com/grenzbotin)) – [vulpis.dev](https://vulpis.dev)
+Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+
+<!-- You can use the all-contributors bot or just list them manually -->
+
+- [jacco-webleads](https://github.com/jacco-webleads) (Parallel Batch Processing)
+- [asiegrist](https://github.com/asiegrist) (Azure OpenAI Support)
+- [DrTimmi](https://github.com/DrTimmi) (Support for nested components, dynamic zones, rich-text fields, and robust JSON parsing)
+
+## Author
+
+- [grenzbotin](https://github.com/grenzbotin) – [vulpis.dev](https://vulpis.dev)
 
 Distributed under the MIT license.
 See `LICENSE` for more information.
