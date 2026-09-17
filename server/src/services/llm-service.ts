@@ -21,6 +21,7 @@ import {
 import {
   balanceJSONBraces,
   cleanJSONString,
+  escapeJSONQuote,
   extractJSONObject,
   safeJSONParse,
 } from '../utils/json-utils';
@@ -424,12 +425,13 @@ const parseLLMResponse = async (response: any): Promise<Record<string, any>> => 
 
     const cleanContent = cleanJSONString(content);
     const jsonContent = extractJSONObject(cleanContent);
+    const escapedJsonContent = escapeJSONQuote(jsonContent);
 
     try {
-      return safeJSONParse(jsonContent);
+      return safeJSONParse(escapedJsonContent);
     } catch (parseError) {
-      const balancedContent = balanceJSONBraces(jsonContent);
-
+      const balancedContent = balanceJSONBraces(escapedJsonContent);
+      
       try {
         return safeJSONParse(balancedContent);
       } catch (secondError) {
