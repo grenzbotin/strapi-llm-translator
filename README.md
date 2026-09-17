@@ -81,7 +81,7 @@ To contribute to the plugin development:
 1. Navigate to your Strapi project
 2. Add and link the plugin: `npx yalc add strapi-llm-translator && npx yalc link strapi-llm-translator && npm install`
 3. Start your Strapi project
-4. In a separate terminal, watch the plugin for changes:
+4. In a separate terminal, in the plugin repository, watch the plugin for changes:
    `npm run watch:link`
 
 ## Contributors ✨
