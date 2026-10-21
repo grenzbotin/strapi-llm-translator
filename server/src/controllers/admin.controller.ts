@@ -15,7 +15,7 @@ const controllers = ({ strapi }: StrapiContext) => ({
       ctx.status = result.meta.status;
       ctx.body = result;
     } catch (error) {
-      console.error('Error in generate controller:', error);
+      strapi.log.error('[strapi-llm-translator] Error in generate controller:', error);
       ctx.status = 500;
       ctx.body = {
         meta: {

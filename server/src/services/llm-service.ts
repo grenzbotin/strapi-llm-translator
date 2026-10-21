@@ -22,6 +22,7 @@ import {
   balanceJSONBraces,
   cleanJSONString,
   extractJSONObject,
+  generateJsonSchema,
   safeJSONParse,
 } from '../utils/json-utils';
 
@@ -268,9 +269,17 @@ const llmService = ({ strapi }: { strapi: Core.Strapi }): LLMServiceType => ({
     config: TranslationConfig
   ): Promise<TranslationResponse> {
     try {
+      strapi.log.info(
+        `[strapi-llm-translator] Starting translation for content type "${contentType?.uid || 'unknown'}" to "${config.targetLanguage}"`
+      );
+
       const userConfig = await getUserConfig();
 
       const translatableFields = extractTranslatableFields(contentType, fields, components);
+
+      strapi.log.info(
+        `[strapi-llm-translator] Found ${translatableFields.length} translatable fields`
+      );
 
       // Split translatableFields in batches
       const batches: TranslatableField[][] = [];
@@ -278,15 +287,27 @@ const llmService = ({ strapi }: { strapi: Core.Strapi }): LLMServiceType => ({
         batches.push(translatableFields.slice(i, i + BATCH_SIZE));
       }
 
+      strapi.log.info(
+        `[strapi-llm-translator] Processing ${batches.length} batch(es) (batch size: ${BATCH_SIZE})`
+      );
+
       const systemPrompt = await buildSystemPrompt(userConfig);
 
       // Process all batches parallel
       const translatedResults = await Promise.all(
-        batches.map(async (batch) => {
+        batches.map(async (batch, batchIndex) => {
           const translationPayload = prepareTranslationPayload(batch);
           const prompt = buildPrompt(translationPayload, config.targetLanguage);
-          const response = await callLLMProvider(prompt, systemPrompt, userConfig);
-          return await parseLLMResponse(response);
+          const schema = generateJsonSchema(translationPayload);
+          const response = await callLLMProvider(
+            prompt,
+            systemPrompt,
+            userConfig,
+            schema,
+            batchIndex + 1,
+            batches.length
+          );
+          return await parseLLMResponse(response, batchIndex + 1, batches.length);
         })
       );
 
@@ -307,6 +328,10 @@ const llmService = ({ strapi }: { strapi: Core.Strapi }): LLMServiceType => ({
         mergedContent
       );
 
+      strapi.log.info(
+        `[strapi-llm-translator] Translation completed successfully for "${contentType?.uid || 'unknown'}" to "${config.targetLanguage}"`
+      );
+
       return {
         data: {
           ...mergedContent,
@@ -319,7 +344,7 @@ const llmService = ({ strapi }: { strapi: Core.Strapi }): LLMServiceType => ({
         },
       };
     } catch (error) {
-      strapi.log.error('LLM translation error:', error);
+      strapi.log.error('[strapi-llm-translator] LLM translation error:', error);
       return {
         data: fields, // Return original fields in case of error
         meta: {
@@ -341,10 +366,11 @@ IMPORTANT RULES:
 3. Maintain any markdown formatting within the text
 4. Keep HTML tags intact if present
 5. Preserve any special characters or placeholders
-6. Return ONLY the translated JSON object
+6. Return ONLY the translated JSON object matching the exact structure
 7. Ensure the JSON is valid and well-formed. Keep arrays and nested objects intact
-8. Do not add any explanations or comments
-9. Ensure professional and culturally appropriate translations
+8. All double quotes inside translated text must be escaped as \\" or written as typographical quotation marks appropriate for ${targetLanguage} (e.g. «...» or „...“). Never output raw unescaped ASCII double quotes inside JSON string values.
+9. Do not add any explanations or comments
+10. Ensure professional and culturally appropriate translations
 
 SOURCE JSON:
 ${JSON.stringify(fields, null, 2)}`;
@@ -369,37 +395,80 @@ const buildSystemPrompt = async (userConfig: PluginUserConfig): Promise<string> 
 
 const createLLMRequest = (
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-  temperature = 0.1
+  temperature = 0.1,
+  schema?: Record<string, any>
 ) => {
+  const responseFormat = schema
+    ? {
+        type: 'json_schema' as const,
+        json_schema: {
+          name: 'translation_response',
+          strict: true,
+          schema,
+        },
+      }
+    : { type: 'json_object' as const };
+
   return llmClient.chat.completions.create({
     model: LLM_MODEL,
     messages,
     temperature,
-    response_format: { type: 'json_object' },
+    response_format: responseFormat,
   });
 };
 
 const callLLMProvider = async (
   prompt: string,
   systemPrompt: string,
-  userConfig: PluginUserConfig
+  userConfig: PluginUserConfig,
+  schema?: Record<string, any>,
+  batchNumber?: number,
+  totalBatches?: number
 ): Promise<any> => {
-  return createLLMRequest(
-    [
-      {
-        role: 'system',
-        content: systemPrompt,
-      },
-      {
-        role: 'user',
-        content: prompt,
-      },
-    ],
-    userConfig?.temperature ?? DEFAULT_LLM_TEMPERATURE
+  const batchLabel = batchNumber ? ` [batch ${batchNumber}/${totalBatches}]` : '';
+  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+    {
+      role: 'system',
+      content: systemPrompt,
+    },
+    {
+      role: 'user',
+      content: prompt,
+    },
+  ];
+  const temperature = userConfig?.temperature ?? DEFAULT_LLM_TEMPERATURE;
+
+  strapi.log.info(
+    `[strapi-llm-translator] Sending prompt to LLM (model: ${LLM_MODEL}, temp: ${temperature})${batchLabel}`
   );
+  strapi.log.info(`[strapi-llm-translator] System prompt:${batchLabel}\n${systemPrompt}`);
+  strapi.log.info(`[strapi-llm-translator] User prompt:${batchLabel}\n${prompt}`);
+  if (schema) {
+    strapi.log.info(
+      `[strapi-llm-translator] JSON Schema constraint:${batchLabel}\n${JSON.stringify(schema, null, 2)}`
+    );
+  }
+
+  if (schema) {
+    try {
+      return await createLLMRequest(messages, temperature, schema);
+    } catch (error) {
+      strapi.log.warn(
+        `[strapi-llm-translator] json_schema format failed, falling back to json_object:${batchLabel} ${
+          error instanceof Error ? error.message : error
+        }`
+      );
+      return await createLLMRequest(messages, temperature);
+    }
+  }
+
+  return createLLMRequest(messages, temperature);
 };
 
 const requestJSONCorrection = async (invalidJson: string): Promise<Record<string, any>> => {
+  strapi.log.warn(
+    `[strapi-llm-translator] Requesting LLM correction for invalid JSON:\n${invalidJson}`
+  );
   const response = await createLLMRequest([
     {
       role: 'system',
@@ -414,31 +483,58 @@ const requestJSONCorrection = async (invalidJson: string): Promise<Record<string
   const correctedContent = response.choices[0]?.message?.content;
   if (!correctedContent) throw new Error('No content in correction response');
 
+  strapi.log.info(`[strapi-llm-translator] Corrected JSON response received:\n${correctedContent}`);
+
   return safeJSONParse(correctedContent.trim());
 };
 
-const parseLLMResponse = async (response: any): Promise<Record<string, any>> => {
+const parseLLMResponse = async (
+  response: any,
+  batchNumber?: number,
+  totalBatches?: number
+): Promise<Record<string, any>> => {
+  const batchLabel = batchNumber ? ` [batch ${batchNumber}/${totalBatches}]` : '';
   try {
     const content = response.choices[0]?.message?.content;
     if (!content) throw new Error('No content in response');
+
+    strapi.log.info(`[strapi-llm-translator] Raw LLM response content:${batchLabel}\n${content}`);
 
     const cleanContent = cleanJSONString(content);
     const jsonContent = extractJSONObject(cleanContent);
 
     try {
-      return safeJSONParse(jsonContent);
+      const parsed = safeJSONParse(jsonContent);
+      strapi.log.info(
+        `[strapi-llm-translator] Successfully parsed JSON response${batchLabel}:\n${JSON.stringify(parsed, null, 2)}`
+      );
+      return parsed;
     } catch (parseError) {
+      strapi.log.warn(
+        `[strapi-llm-translator] First parse attempt failed${batchLabel}: ${
+          parseError instanceof Error ? parseError.message : parseError
+        }`
+      );
       const balancedContent = balanceJSONBraces(jsonContent);
 
       try {
-        return safeJSONParse(balancedContent);
+        const parsed = safeJSONParse(balancedContent);
+        strapi.log.info(
+          `[strapi-llm-translator] Successfully parsed JSON response after brace balancing${batchLabel}:\n${JSON.stringify(parsed, null, 2)}`
+        );
+        return parsed;
       } catch (secondError) {
-        console.error('Second parse attempt failed:', secondError);
+        strapi.log.warn(
+          `[strapi-llm-translator] Second parse attempt failed${batchLabel}: ${
+            secondError instanceof Error ? secondError.message : secondError
+          }`
+        );
         return await requestJSONCorrection(cleanContent);
       }
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    strapi.log.error(`[strapi-llm-translator] Parsing failed${batchLabel}: ${errorMessage}`);
     throw new Error(`Translation failed: ${errorMessage}`);
   }
 };
