@@ -358,7 +358,7 @@ const llmService = ({ strapi }: { strapi: Core.Strapi }): LLMServiceType => ({
 });
 
 const buildPrompt = (fields: Record<string, any>, targetLanguage: string): string => {
-  return `You are translating content from a CMS. Please translate the following JSON data to ${targetLanguage}.
+  return `You are translating content from a CMS. Please translate the following JSON data to '${targetLanguage}' language.
 
 IMPORTANT RULES:
 1. Preserve all JSON structure and keys exactly as provided
@@ -368,7 +368,7 @@ IMPORTANT RULES:
 5. Preserve any special characters or placeholders
 6. Return ONLY the translated JSON object matching the exact structure
 7. Ensure the JSON is valid and well-formed. Keep arrays and nested objects intact
-8. All double quotes inside translated text must be escaped as \\" or written as typographical quotation marks appropriate for ${targetLanguage} (e.g. «...» or „...“). Never output raw unescaped ASCII double quotes inside JSON string values.
+8. All double quotes inside translated text must be escaped as \\" or written as typographical quotation marks appropriate for '${targetLanguage}' (e.g. «...» or „...“). Never output raw unescaped ASCII double quotes inside JSON string values.
 9. Do not add any explanations or comments
 10. Ensure professional and culturally appropriate translations
 
