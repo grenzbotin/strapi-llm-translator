@@ -4,13 +4,11 @@ export const cleanJSONString = (content: string): string => {
     .replace(/^```\s*\n/, '')
     .replace(/\n\s*```$/, '')
     .replace(/\u200B/g, '')
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201C\u201D]/g, '"')
     .trim();
 };
 
 export const balanceJSONBraces = (content: string): string => {
-   let openBraces = 0;
+  let openBraces = 0;
   let closeBraces = 0;
   let inString = false;
 
@@ -39,6 +37,47 @@ export const extractJSONObject = (content: string): string => {
     return content.slice(firstBrace, lastBrace + 1);
   }
   return content;
+};
+
+export const generateJsonSchema = (data: any): Record<string, any> => {
+  if (data === null || data === undefined) {
+    return { type: 'string' };
+  }
+
+  if (Array.isArray(data)) {
+    const itemSchema = data.length > 0 ? generateJsonSchema(data[0]) : { type: 'string' };
+    return {
+      type: 'array',
+      items: itemSchema,
+    };
+  }
+
+  if (typeof data === 'object') {
+    const properties: Record<string, any> = {};
+    const required: string[] = [];
+
+    for (const key of Object.keys(data)) {
+      properties[key] = generateJsonSchema(data[key]);
+      required.push(key);
+    }
+
+    return {
+      type: 'object',
+      properties,
+      required,
+      additionalProperties: false,
+    };
+  }
+
+  if (typeof data === 'number') {
+    return { type: 'number' };
+  }
+
+  if (typeof data === 'boolean') {
+    return { type: 'boolean' };
+  }
+
+  return { type: 'string' };
 };
 
 export const safeJSONParse = (content: string): Record<string, any> => {
